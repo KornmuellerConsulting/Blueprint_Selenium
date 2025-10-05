@@ -1,290 +1,245 @@
-# 🧭 Locator Guide – Playwright Best Practices
+# 🧭 Playwright Locator Guide
 
-Ein stabiler und wartbarer Test steht und fällt mit sauberen Locatoren.  
-Dieser Guide zeigt dir, **wie du Webelemente in Playwright zuverlässig findest**, wie du mit dynamischen Attributen umgehst, und welche Strategien du für verschiedene HTML-Strukturen verwenden solltest.
+Ein vollständiger Guide für den Aufbau und die Priorisierung von **Locators** in Playwright.
 
 ---
 
-## ⚙️ Grundlagen
+## 🔝 Locator-Priorität (von „beste“ zu „schlechteste“)
 
-In Playwright werden Elemente über **Locator-APIs** angesprochen.  
-Beispiele:
+| Priorität | Typ | Beschreibung |
+|------------|------|---------------|
+| 🥇 1 | `data-testid` / `data-qa` / `data-test` | Stabil, semantisch sinnvoll, unabhängig von Design |
+| 🥈 2 | `id` | Schnell, eindeutig, aber oft dynamisch generiert |
+| 🥉 3 | Kombination aus Attributen (z. B. `.user-card [data-testid="edit"]`) | Gut für Komponenten mit stabilem Aufbau |
+| 4️⃣ | `class` | Nur nutzen, wenn eindeutig und stabil |
+| 5️⃣ | Text | Gut lesbar, aber anfällig bei Sprachänderungen |
+| 🚫 6 | XPath | Vermeiden – instabil, unlesbar, schwer zu pflegen |
+
+---
+
+## 🧩 1. Lokalisieren über ID
+
+Wenn ein Element eine eindeutige **id** besitzt – **immer diese verwenden**.
+
+```html
+<button id="submit-btn">Absenden</button>
+```
 
 ```ts
-// Beispiel in TypeScript
-const button = page.locator('button#submit');
-await button.click();
-
-// oder kürzer:
-await page.locator('text=Speichern').click();
-Playwright verwendet "Smart Locators", d. h. es kombiniert intern Strategien, um Elemente zu finden.
-Trotzdem solltest du bewusst und eindeutig schreiben, um Flakiness zu vermeiden.
-
-🧩 1. Lokalisieren über id
-Wenn ein Element eine eindeutige id besitzt – immer diese verwenden.
-
-html
-Code kopieren
-<button id="submit-btn">Absenden</button>
-ts
-Code kopieren
 await page.locator('#submit-btn').click();
-✅ Best Practice:
+```
 
-Immer IDs bevorzugen, wenn sie stabil sind.
+✅ **Best Practice**
+- IDs bevorzugen, wenn sie stabil sind  
+- Kein XPath, kein Text nötig  
+- Schnell und eindeutig
 
-Kein XPath, kein Text nötig.
-
-Schnell und eindeutig.
-
-⚠️ Anti-Pattern:
-
-ts
-Code kopieren
-// Zu allgemein, kann sich ändern:
+⚠️ **Anti-Pattern**
+```ts
+// Zu allgemein, kann sich ändern
 await page.locator('button').click();
-🎯 2. Lokalisieren über class
-class sollte nur verwendet werden, wenn keine ID oder Data-Attribute vorhanden sind.
+```
 
-html
-Code kopieren
+---
+
+## 🎯 2. Lokalisieren über Class
+
+Class sollte nur verwendet werden, wenn keine ID oder Data-Attribute vorhanden sind.
+
+```html
 <button class="btn btn-primary submit-btn">Absenden</button>
-ts
-Code kopieren
+```
+
+```ts
 await page.locator('.submit-btn').click();
-✅ Best Practice:
+```
 
-Verwende eindeutige Klassen.
+✅ **Best Practice**
+- Verwende eindeutige Klassen  
+- Kombiniere Klassen sparsam  
+- Bei CSS-Frameworks generische Klassen meiden (`.btn`, `.text-center` etc.)
 
-Kombiniere Klassen sparsam:
+⚠️ **Anti-Pattern**
+```ts
+await page.locator('.btn').click(); // Sehr unspezifisch
+```
 
-ts
-Code kopieren
-await page.locator('button.btn-primary.submit-btn');
-Wenn du CSS-Bibliotheken wie Bootstrap oder Tailwind nutzt, vermeide generische Klassen wie .btn oder .text-center.
+---
 
-⚠️ Anti-Pattern:
+## 🧾 3. Lokalisieren über Data-Attribute
 
-ts
-Code kopieren
-// Sehr unspezifisch
-await page.locator('.btn').click();
-🧾 3. Lokalisieren über data-* Attribute
-Das ist der Goldstandard für Testautomatisierung, da diese Attribute stabil, lesbar und unabhängig vom Styling sind.
+Das ist der **Goldstandard** für Testautomatisierung, da diese stabil, lesbar und unabhängig vom Styling sind.
 
-html
-Code kopieren
+```html
 <button data-testid="submit-order">Bestellung abschicken</button>
-ts
-Code kopieren
+```
+
+```ts
 await page.locator('[data-testid="submit-order"]').click();
-✅ Best Practice:
+```
 
-Verwende data-testid, data-test oder data-qa Attribute.
+✅ **Best Practice**
+- Verwende `data-testid`, `data-test` oder `data-qa`
+- Keine IDs oder Klassen „missbrauchen“
+- Einheitlicher Namensstil im Projekt (`data-testid="user-login-button"`)
 
-Keine IDs oder Klassen „missbrauchen“.
+---
 
-Konsistenter Namensstil im Projekt:
+## 💬 4. Lokalisieren über Text
 
-html
-Code kopieren
-data-testid="user-login-button"
-💬 4. Lokalisieren über Text
-Für Buttons, Labels und Links oft sehr praktisch.
+Ideal für Buttons, Labels und Links mit statischem Text.
 
-html
-Code kopieren
+```html
 <button>Speichern</button>
-ts
-Code kopieren
+```
+
+```ts
 await page.locator('text=Speichern').click();
+```
+
 Oder mit partiellem Match:
 
-ts
-Code kopieren
+```ts
 await page.locator('button:has-text("Speichern")').click();
-✅ Best Practice:
+```
 
-Ideal für statische Texte.
+✅ **Best Practice**
+- Ideal für statische Texte  
+- Schnell einsetzbar, gut lesbar
 
-Schnell einsetzbar, gut lesbar.
+⚠️ **Achtung**
+- Sprachabhängig (Internationalisierung!)  
+- Änderungen am Text → Tests brechen
 
-⚠️ Achtung:
+---
 
-Sprachabhängig (Internationalisierung!).
+## 🔗 5. Kombinierte Selektoren
 
-Änderung des Textes → Test bricht.
+Kombinierte Selektoren erhöhen die Präzision, ohne unlesbar zu werden.
 
-🔗 5. Lokalisieren über kombinierte Selektoren
-Du kannst Selektoren kombinieren, um präziser zu werden:
-
-html
-Code kopieren
+```html
 <div class="user-card">
   <button data-testid="edit-user">Bearbeiten</button>
 </div>
-ts
-Code kopieren
-await page.locator('.user-card >> [data-testid="edit-user"]').click();
-Oder mit CSS-Notation:
+```
 
-ts
-Code kopieren
+```ts
 await page.locator('.user-card [data-testid="edit-user"]').click();
-Oder mit hierarchischen Bedingungen:
+```
 
-ts
-Code kopieren
+Alternativ mit Hierarchie:
+
+```ts
 await page.locator('.user-card').locator('button:has-text("Bearbeiten")').click();
-🧩 6. Lokalisieren mit Variablen / dynamischen Werten
-Wenn du Variablen in Locatoren einbauen willst, nutze Template Literals (Backticks):
+```
 
-ts
-Code kopieren
+---
+
+## 🧩 6. Dynamische Locators (Variablen)
+
+Wenn du Variablen einbauen willst, nutze **Template Literals**:
+
+```ts
 const username = 'Patrick';
 await page.locator(`[data-testid="user-${username}"]`).click();
-Oder dynamische Texte:
+```
 
-ts
-Code kopieren
+Auch für Texte:
+
+```ts
 const productName = 'SuperLaptop';
 await page.locator(`text=${productName}`).click();
-Auch kombinierbar mit has-text:
+```
 
-ts
-Code kopieren
+Oder kombiniert:
+
+```ts
 await page.locator(`div:has-text("${username}")`);
-✅ Pro-Tipp:
-Immer String-Interpolation (${}) verwenden, nicht +-Verkettung.
+```
 
-🧱 7. :has(), :has-text(), :nth() und komplexe CSS-Logik
-Playwright unterstützt CSS-Pseudo-Selektoren wie:
+✅ **Pro-Tipp**
+- Immer `${}`-Interpolation verwenden, nicht `+`-Verkettung
 
-ts
-Code kopieren
+---
+
+## 🧱 7. Erweiterte Selektoren: `:has()`, `:has-text()`, `nth()`
+
+Playwright unterstützt mächtige CSS-Pseudo-Selektoren:
+
+```ts
 await page.locator('div:has(button:has-text("Speichern"))');
-Das erlaubt sehr präzise, aber trotzdem lesbare Selektoren.
+```
 
 Weitere Beispiele:
 
-ts
-Code kopieren
-// Erstes Element:
+```ts
+// Erstes Element
 await page.locator('.list-item').nth(0).click();
 
-// Element innerhalb eines bestimmten Containers:
-await page.locator('.modal:has-text("Einstellungen") >> button:has-text("Speichern")');
-⚡ 8. getBy-APIs (seit Playwright v1.28+)
-Playwright bietet spezielle Methoden für häufige Szenarien:
-
-ts
-Code kopieren
-await page.getByRole('button', { name: 'Speichern' }).click();
-await page.getByLabel('Benutzername').fill('Patrick');
-await page.getByPlaceholder('Passwort').fill('123456');
-await page.getByText('Willkommen').isVisible();
-✅ Empfohlene APIs:
-
-getByRole() → für Buttons, Links, Checkboxen (zugänglichkeitsfreundlich)
-
-getByLabel() → für Formulare
-
-getByText() → für sichtbare Texte
-
-getByTestId() → für eigene data-testid Attribute
-
-📘 Beispiel:
-
-ts
-Code kopieren
-await page.getByTestId('submit-order').click();
-🧮 9. XPath (nur wenn unbedingt nötig)
-XPath ist mächtig, aber fehleranfällig und schlecht wartbar.
-Verwende ihn nur, wenn keine andere Option besteht (z. B. bei dynamisch generierten PDFs oder altmodischem HTML).
-
-ts
-Code kopieren
-await page.locator('//div[@class="container"]//button[text()="Löschen"]');
-❌ Nur letzte Option – CSS, Data-Attributes oder getBy...() sind fast immer besser.
-
-🧰 10. Dynamische Inhalte & Wartezeiten
-Wenn ein Element asynchron erscheint:
-
-ts
-Code kopieren
-await page.locator('[data-testid="result"]').waitFor();
-await page.locator('[data-testid="result"]').isVisible();
-Oder:
-
-ts
-Code kopieren
-await expect(page.locator('[data-testid="result"]')).toBeVisible();
-🧠 11. Debugging & Tipps
-npx playwright codegen <URL> → interaktiver Recorder mit Locator-Vorschlägen
-
-page.pause() → Interaktives Debugging
-
-locator.first(), locator.last(), locator.nth() → präzise Auswahl bei mehrfachen Treffern
-
-locator.filter() → Filtert nach Text, Rolle, Sichtbarkeit
-
-ts
-Code kopieren
-await page.locator('button').filter({ hasText: 'Löschen' }).click();
-🧭 Locator-Priorität (von best bis worst)
-Priorität	Methode	Beispiel	Stabilität	Empfehlung
-1️⃣	getByTestId() / data-testid	getByTestId('submit') / [data-testid="submit"]	🟢 Sehr stabil	✅ Immer bevorzugen
-2️⃣	id	#username	🟢 Stabil	✅ Gut
-3️⃣	getByRole() / getByLabel()	getByRole('button', { name: 'Speichern' })	🟢 Stabil	✅ Gut
-4️⃣	class	.submit-btn	🟠 Mittel	⚠️ Nur wenn eindeutig
-5️⃣	Text	text=Speichern	🟠 Mittel	⚠️ Sprachabhängig
-6️⃣	XPath	//button[text()="Speichern"]	🔴 Fragil	🚫 Nur Notlösung
-
-🧩 Beispiel: Dynamischer Locator mit Variable und Fallback
-ts
-Code kopieren
-async function clickUser(userName: string) {
-  const userLocator = page.locator(`[data-testid="user-${userName}"]`);
-  
-  if (await userLocator.count() > 0) {
-    await userLocator.click();
-  } else {
-    // Fallback über Text
-    await page.locator(`text=${userName}`).click();
-  }
-}
-✅ Fazit
-Saubere Locatoren = stabile Tests.
-
-Bevor du einen Locator baust, frag dich:
-
-Gibt es ein data-testid? → Verwende es.
-
-Gibt es eine id? → Nutze sie.
-
-Kein Identifier? → Erstelle ein semantisches Attribut oder fallback auf getByRole() oder Text.
-
-Weniger Magie, mehr Struktur = langfristig wartbare Tests.
-
-yaml
-Code kopieren
+// Element innerhalb eines bestimmten Containers
+await page.locator('.modal:has-text("Einstellungen") >> button:has-text("Speichern")').click();
+```
 
 ---
 
-✅ **So fügst du’s ein:**
-1. Öffne dein GitHub-Repo.  
-2. Gehe auf `README.md`.  
-3. Klick auf **Edit (✏️)**.  
-4. **Markiere alles**, füge den obigen Block ein.  
-5. Committen → fertig.
+## 🧩 8. Lokatoren für verschachtelte Strukturen
+
+Wenn du innerhalb komplexer DOM-Strukturen arbeitest, kannst du „Chaining“ nutzen:
+
+```ts
+const card = page.locator('.product-card').filter({ hasText: 'Laptop' });
+await card.locator('button:has-text("Kaufen")').click();
+```
+
+Oder über **role-based locators**:
+
+```ts
+await page.getByRole('button', { name: 'Absenden' }).click();
+```
+
+✅ **Best Practice**
+- Verwende `getByRole` für Barrierefreiheit-konforme Elemente  
+- Nutze `.filter()` bei wiederkehrenden Strukturen (Listen, Tabellen)
 
 ---
 
-Möchtest du, dass ich dir im Anschluss noch eine zweite Datei (`LOCATOR_BEST_PRACTICES.md`) baue, die du separat verlinken kannst – z. B. mit praktischen Codebeispielen aus Playwright Page Objects (mit `this.usernameInput = page.getByTestId(...)` etc.)?  
-Dann wäre dein Repo-Doku-Setup komplett rund.
+## ⚙️ 9. Debugging & Locator-Strategien in der Praxis
 
+💡 **Locator-Playground**:  
+Führe `npx playwright codegen <url>` aus, um automatisch Locatoren generieren zu lassen.
 
+💡 **Selector Preview**:  
+Mit `page.locator('selector').highlight()` kannst du direkt im Browser das Ziel prüfen.
 
+💡 **Test-Linter**:  
+Nutze ESLint-Regeln oder Pre-Commit-Hooks, um ungültige oder zu breite Selektoren zu verhindern.
 
+---
 
+## ❌ Vermeide folgende Anti-Patterns
 
+| Anti-Pattern | Warum schlecht |
+|---------------|----------------|
+| XPath (`//div[3]/button`) | Instabil, schwer zu warten |
+| `.class:nth-child(2)` | Bricht bei DOM-Änderungen |
+| `button` ohne Attribut | Zu allgemein |
+| `text=Speichern` bei dynamischem Text | Sprachabhängig |
+| Kombination aus 4+ verschachtelten Selektoren | Schwer zu lesen und zu debuggen |
+
+---
+
+## ✅ Zusammenfassung
+
+**Locator-Strategie von oben nach unten:**
+
+1. `data-testid` oder `data-qa`
+2. `id`
+3. Kombination (z. B. `.card [data-testid="edit"]`)
+4. `class`
+5. `text`
+6. Kein XPath
+
+---
+
+> **Tipp:**  
+> Erstelle in eurem Projekt einen gemeinsamen `Locator Guide` oder eine zentrale `selectors.ts` Datei mit gut benannten, wiederverwendbaren Locatoren.
